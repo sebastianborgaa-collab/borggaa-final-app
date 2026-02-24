@@ -62,13 +62,36 @@ button.secondary { background: #7c3aed; color: white; }
 }
 .hz-row > button { background: #1f2937; color: white; }
 .hz-display {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   background: #0b1220;
   border: 1px solid #334155;
   border-radius: 10px;
   padding: 10px;
   font-weight: 700;
   font-size: 1.1rem;
+}
+.hz-display .hz-input {
+  width: 4.5em;
+  text-align: right;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+}
+.hz-display .hz-input:focus {
+  outline: none;
+}
+.hz-display .hz-input::-webkit-outer-spin-button,
+.hz-display .hz-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.hz-display .hz-input[type="number"] {
+  -moz-appearance: textfield;
 }
 .select-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .select-row select {

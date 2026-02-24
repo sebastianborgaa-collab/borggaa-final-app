@@ -32,7 +32,11 @@ export default function App() {
     const note = url.searchParams.get("note");
     const toneQuality = url.searchParams.get("toneQuality");
 
-    if (rangeHz) audio.setHzFromSlider(Number(rangeHz));
+    if (rangeHz) {
+      const v = Number(rangeHz);
+      if (v <= 1) audio.setHzFromSlider(v);
+      else audio.setHz(v);
+    }
     else if (note) audio.setNoteIndex(Number(note));
 
     if (toneQuality) {
@@ -52,7 +56,7 @@ export default function App() {
 
   const shareUrl = useMemo(() => {
     const u = new URL(window.location.href);
-    u.searchParams.set("rangeHz", String(audio.sliderValue));
+    u.searchParams.set("rangeHz", String(Math.round(audio.hz)));
     u.searchParams.set("note", String(audio.noteIndex));
     const toneButtonId = {
       sine: "buttonSine",
@@ -65,7 +69,7 @@ export default function App() {
     }[audio.tone];
     u.searchParams.set("toneQuality", toneButtonId);
     return u.toString();
-  }, [audio.noteIndex, audio.sliderValue, audio.tone]);
+  }, [audio.noteIndex, audio.hz, audio.tone]);
 
   const copyLink = async () => {
     try {
@@ -109,10 +113,10 @@ export default function App() {
           <input
             type="range"
             min={0}
-            max={15000}
-            step={1}
-            value={Math.round(audio.hz)}
-            onChange={(e) => audio.setHz(Number(e.target.value))}
+            max={150000}
+            step={10}
+            value={Math.round(audio.hz * 10)}
+            onInput={(e) => audio.setHz(Number((e.target as HTMLInputElement).value) / 10)}
           />
           <div className="marks">
             {marks.map((m) => (
@@ -131,7 +135,21 @@ export default function App() {
         <div className="hz-row">
           <button onClick={audio.half}>½</button>
           <button onClick={audio.minusOne}>−</button>
-          <div className="hz-display">{Math.round(audio.hz)} Hz</div>
+          <div className="hz-display">
+            <input
+              type="number"
+              min={0}
+              max={15000}
+              step={1}
+              value={Math.round(audio.hz)}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isNaN(v)) audio.setHz(Math.max(0, Math.min(15000, v)));
+              }}
+              className="hz-input"
+            />
+            {" Hz"}
+          </div>
           <button onClick={audio.plusOne}>+</button>
           <button onClick={audio.double}>×2</button>
         </div>
