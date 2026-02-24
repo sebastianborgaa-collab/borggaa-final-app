@@ -131,7 +131,7 @@ export default function App() {
         <div className="hz-row">
           <button onClick={audio.half}>½</button>
           <button onClick={audio.minusOne}>−</button>
-          <div className="hz-display">{formatHz(audio.hz)} Hz</div>
+          <div className="hz-display">{Math.round(audio.hz)} Hz</div>
           <button onClick={audio.plusOne}>+</button>
           <button onClick={audio.double}>×2</button>
         </div>
