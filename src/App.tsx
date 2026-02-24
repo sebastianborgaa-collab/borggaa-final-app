@@ -3,7 +3,8 @@ import { NOTE_LABELS, ToneType, useTinnitusAudio } from "./useTinnitusAudio";
 
 const toneOptions: { label: string; value: ToneType }[] = [
   { label: "Sine", value: "sine" },
-  { label: "Square", value: "square" },
+  { label: "Cicada", value: "cicada" },
+  { label: "Cricket", value: "cricket" },
   { label: "Triangle", value: "triangle" },
   { label: "Sawtooth", value: "sawtooth" },
   { label: "Filtered", value: "filtered" },
@@ -37,7 +38,8 @@ export default function App() {
     if (toneQuality) {
       const map: Record<string, ToneType> = {
         buttonSine: "sine",
-        buttonSquare: "square",
+        buttonCicada: "cicada",
+        buttonCricket: "cricket",
         buttonTriangle: "triangle",
         buttonSawtooth: "sawtooth",
         buttonFiltered: "filtered",
@@ -54,7 +56,8 @@ export default function App() {
     u.searchParams.set("note", String(audio.noteIndex));
     const toneButtonId = {
       sine: "buttonSine",
-      square: "buttonSquare",
+      cicada: "buttonCicada",
+      cricket: "buttonCricket",
       triangle: "buttonTriangle",
       sawtooth: "buttonSawtooth",
       filtered: "buttonFiltered",
@@ -107,7 +110,7 @@ export default function App() {
             type="range"
             min={0}
             max={1}
-            step={0.001}
+            step={1 / 15000}
             value={audio.sliderValue}
             onChange={(e) => audio.setHzFromSlider(Number(e.target.value))}
           />
