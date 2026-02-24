@@ -13,36 +13,6 @@ function sliderToHz(v: number) {
   return MIN_HZ + (MAX_HZ - MIN_HZ) * v;
 }
 
-function hzToNoteIndex(hz: number) {
-  let noteNumber = 12 * Math.log2(hz / 440);
-  noteNumber = Math.round(noteNumber) + 36;
-  if (Math.floor(hz) < 53) return 0;
-  if (Math.floor(hz) > 14080) return 97;
-  return Math.max(0, Math.min(97, noteNumber));
-}
-
-function noteIndexToHz(noteIndex: number) {
-  const note = noteIndex - 36;
-  return Math.pow(2, note / 12) * 440;
-}
-
-function buildNoteLabels() {
-  const names = ["A", "A# / Bb", "B", "C", "C# / Db", "D", "D# / Eb", "E", "F", "F# / Gb", "G", "G# / Ab"];
-  const labels: string[] = [];
-  for (let i = 0; i <= 97; i++) {
-    if (i === 97) {
-      labels.push("> A8");
-      continue;
-    }
-    const idx = i % 12;
-    const octave = Math.floor((i + 9) / 12) + 1;
-    labels.push(`${names[idx]} ${octave}`);
-  }
-  return labels;
-}
-
-export const NOTE_LABELS = buildNoteLabels();
-
 function baseGainForTone(tone: ToneType): number {
   if (tone === "cicada" || tone === "cricket") return 0.15;
   if (tone === "sawtooth") return 0.1;
@@ -250,9 +220,6 @@ export function useTinnitusAudio() {
 
   const setHzFromSlider = useCallback((v: number) => setHz(sliderToHz(v)), [setHz]);
   const sliderValue = hzToSlider(hz);
-  const noteIndex = hzToNoteIndex(hz);
-
-  const setNoteIndex = useCallback((i: number) => setHz(noteIndexToHz(i)), [setHz]);
 
   const half = useCallback(() => setHz(hz / 2), [hz, setHz]);
   const double = useCallback(() => setHz(hz * 2), [hz, setHz]);
@@ -285,8 +252,6 @@ export function useTinnitusAudio() {
     stop,
     sliderValue,
     setHzFromSlider,
-    noteIndex,
-    setNoteIndex,
     half,
     double,
     plusOne,

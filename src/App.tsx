@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from "react";
-import { NOTE_LABELS, ToneType, useTinnitusAudio } from "./useTinnitusAudio";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { ToneType, useTinnitusAudio } from "./useTinnitusAudio";
 
 const toneOptions: { label: string; value: ToneType }[] = [
   { label: "Sine", value: "sine" },
@@ -12,7 +12,7 @@ const toneOptions: { label: string; value: ToneType }[] = [
 ];
 
 const MAX_HZ = 15000;
-const marks = [0, 3000, 6000, 9000, 12000, 15000];
+const marks = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000, 13000, 14000, 15000];
 
 function hzToSlider(hz: number) {
   return hz / MAX_HZ;
@@ -25,11 +25,29 @@ function formatHz(hz: number): string {
 
 export default function App() {
   const audio = useTinnitusAudio();
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  const getHzFromPosition = useCallback((clientX: number) => {
+    const track = trackRef.current;
+    if (!track) return audio.hz;
+    const rect = track.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return ratio * MAX_HZ;
+  }, [audio.hz]);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    (e.target as Element).setPointerCapture(e.pointerId);
+    audio.setHz(getHzFromPosition(e.clientX));
+  }, [audio, getHzFromPosition]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === "mouse" && e.buttons !== 1) return;
+    audio.setHz(getHzFromPosition(e.clientX));
+  }, [audio, getHzFromPosition]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
     const rangeHz = url.searchParams.get("rangeHz");
-    const note = url.searchParams.get("note");
     const toneQuality = url.searchParams.get("toneQuality");
 
     if (rangeHz) {
@@ -37,7 +55,6 @@ export default function App() {
       if (v <= 1) audio.setHzFromSlider(v);
       else audio.setHz(v);
     }
-    else if (note) audio.setNoteIndex(Number(note));
 
     if (toneQuality) {
       const map: Record<string, ToneType> = {
@@ -57,7 +74,6 @@ export default function App() {
   const shareUrl = useMemo(() => {
     const u = new URL(window.location.href);
     u.searchParams.set("rangeHz", String(Math.round(audio.hz)));
-    u.searchParams.set("note", String(audio.noteIndex));
     const toneButtonId = {
       sine: "buttonSine",
       cicada: "buttonCicada",
@@ -69,7 +85,7 @@ export default function App() {
     }[audio.tone];
     u.searchParams.set("toneQuality", toneButtonId);
     return u.toString();
-  }, [audio.noteIndex, audio.hz, audio.tone]);
+  }, [audio.hz, audio.tone]);
 
   const copyLink = async () => {
     try {
@@ -110,14 +126,26 @@ export default function App() {
         </div>
 
         <div className="slider-wrap">
-          <input
-            type="range"
-            min={0}
-            max={150000}
-            step={10}
-            value={Math.round(audio.hz * 10)}
-            onInput={(e) => audio.setHz(Number((e.target as HTMLInputElement).value) / 10)}
-          />
+          <div
+            ref={trackRef}
+            className="slider-track"
+            role="slider"
+            aria-valuemin={0}
+            aria-valuemax={MAX_HZ}
+            aria-valuenow={Math.round(audio.hz)}
+            tabIndex={0}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={(e) => (e.target as Element).releasePointerCapture(e.pointerId)}
+            onPointerCancel={(e) => (e.target as Element).releasePointerCapture(e.pointerId)}
+            onKeyDown={(e) => {
+              const step = e.shiftKey ? 100 : 1;
+              if (e.key === "ArrowLeft" || e.key === "ArrowDown") audio.setHz(Math.max(0, audio.hz - step));
+              if (e.key === "ArrowRight" || e.key === "ArrowUp") audio.setHz(Math.min(MAX_HZ, audio.hz + step));
+            }}
+          >
+            <div className="slider-thumb" style={{ left: `${(audio.hz / MAX_HZ) * 100}%` }} />
+          </div>
           <div className="marks">
             {marks.map((m) => (
               <button
@@ -152,15 +180,6 @@ export default function App() {
           </div>
           <button onClick={audio.plusOne}>+</button>
           <button onClick={audio.double}>×2</button>
-        </div>
-
-        <div className="select-row">
-          <label>Note</label>
-          <select value={audio.noteIndex} onChange={(e) => audio.setNoteIndex(Number(e.target.value))}>
-            {NOTE_LABELS.map((label, i) => (
-              <option value={i} key={i}>{label}</option>
-            ))}
-          </select>
         </div>
 
         <div className="tone-grid">
