@@ -109,10 +109,10 @@ export default function App() {
           <input
             type="range"
             min={0}
-            max={1}
-            step={1 / 15000}
-            value={audio.sliderValue}
-            onChange={(e) => audio.setHzFromSlider(Number(e.target.value))}
+            max={15000}
+            step={1}
+            value={Math.round(audio.hz)}
+            onChange={(e) => audio.setHz(Number(e.target.value))}
           />
           <div className="marks">
             {marks.map((m) => (
