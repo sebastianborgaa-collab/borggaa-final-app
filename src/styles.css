@@ -19,8 +19,34 @@ body {
   padding: 20px;
   box-shadow: 0 10px 30px rgba(0,0,0,.35);
 }
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.app-header .logo-wrap {
+  background: #1e3a5f;
+  padding: 10px 12px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-header .logo {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+  filter: invert(1) brightness(1.1);
+}
+.app-header .header-text { flex: 1; min-width: 0; }
+.app-header h1 { margin: 0 0 4px; font-size: 1.25rem; line-height: 1.3; }
+.app-header .tagline {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
 h1 { margin: 0 0 8px; font-size: 1.5rem; }
-.muted { margin: 0 0 16px; color: #94a3b8; }
 .controls-row { display: flex; gap: 10px; margin-bottom: 16px; }
 .volume-row {
   display: flex;

@@ -14,7 +14,7 @@ function sliderToHz(v: number) {
 }
 
 function baseGainForTone(tone: ToneType): number {
-  if (tone === "cicada" || tone === "cricket") return 0.15;
+  if (tone === "cicada" || tone === "cricket") return 0.2;
   if (tone === "sawtooth") return 0.1;
   return 0.5;
 }
@@ -33,7 +33,7 @@ export function useTinnitusAudio() {
   const noiseRef = useRef<AudioBufferSourceNode | null>(null);
   const bandpassRef = useRef<BiquadFilterNode | null>(null);
   const noiseBufferRef = useRef<AudioBuffer | null>(null);
-  const trillRef = useRef<OscillatorNode | null>(null);
+  const lfo2Ref = useRef<OscillatorNode | null>(null);
 
   const ensureCtx = useCallback(() => {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
@@ -54,7 +54,7 @@ export function useTinnitusAudio() {
   const stopNodes = useCallback(() => {
     try { oscRef.current?.stop(); } catch {}
     try { lfoRef.current?.stop(); } catch {}
-    try { trillRef.current?.stop(); } catch {}
+    try { lfo2Ref.current?.stop(); } catch {}
     try { noiseRef.current?.stop(); } catch {}
     if (gainRef.current) {
       try { gainRef.current.disconnect(); } catch {}
@@ -62,7 +62,7 @@ export function useTinnitusAudio() {
     }
     oscRef.current = null;
     lfoRef.current = null;
-    trillRef.current = null;
+    lfo2Ref.current = null;
     noiseRef.current = null;
     lfoGainRef.current = null;
     bandpassRef.current = null;
@@ -125,73 +125,79 @@ export function useTinnitusAudio() {
       lfoRef.current = cicadaLfo;
       lfoGainRef.current = lfoGain;
     } else if (useTone === "cricket") {
-      const noise = ctx.createBufferSource();
-      noise.buffer = noiseBufferRef.current!;
-      noise.loop = true;
-
-      const bandpass = ctx.createBiquadFilter();
-      bandpass.type = "bandpass";
-      bandpass.frequency.setValueAtTime(useHz, ctx.currentTime);
-      bandpass.Q.value = 5;
-
-      gain.gain.value = 0;
-      const chirpGain = ctx.createGain();
-      chirpGain.gain.value = baseGain * useVolume;
-
-      const sawtooth = ctx.createOscillator();
-      sawtooth.type = "sawtooth";
-      sawtooth.frequency.value = 2.6;
-
-      const curveLength = 256;
-      const curve = new Float32Array(curveLength);
-      for (let i = 0; i < curveLength; i++) {
-        const x = (i / (curveLength - 1)) * 2 - 1;
-        curve[i] = x > 0.88 ? (x - 0.88) / 0.12 : 0;
-      }
-      const shaper = ctx.createWaveShaper();
-      shaper.curve = curve;
-
-      const trill = ctx.createOscillator();
-      trill.type = "sine";
-      trill.frequency.value = 70;
-      const trillGain = ctx.createGain();
-      trillGain.gain.value = 0.08 * baseGain * useVolume;
-
-      noise.connect(bandpass).connect(gain);
-      sawtooth.connect(shaper).connect(chirpGain).connect(gain.gain);
-      trill.connect(trillGain).connect(gain.gain);
-      noise.start();
-      sawtooth.start();
-      trill.start();
-
-      noiseRef.current = noise;
-      bandpassRef.current = bandpass;
-      lfoRef.current = sawtooth;
-      lfoGainRef.current = trillGain;
-      trillRef.current = trill;
-    } else {
       const osc = ctx.createOscillator();
-      osc.type = useTone === "filtered" ? "sine" : useTone;
+      osc.type = "sine";
       osc.frequency.setValueAtTime(useHz, ctx.currentTime);
-
       osc.connect(gain);
       osc.start();
       oscRef.current = osc;
 
-      if (useTone === "filtered") {
-        const lfo = ctx.createOscillator();
-        lfo.type = "triangle";
-        lfo.frequency.value = 50;
+      const buzzLfo = ctx.createOscillator();
+      buzzLfo.type = "triangle";
+      buzzLfo.frequency.value = 48;
+      const buzzGain = ctx.createGain();
+      buzzGain.gain.value = 0.028;
+      buzzLfo.connect(buzzGain).connect(gain.gain);
 
-        const lfoGain = ctx.createGain();
-        lfoGain.gain.value = 0.125;
-
-        lfo.connect(lfoGain).connect(gain.gain);
-        lfo.start();
-
-        lfoRef.current = lfo;
-        lfoGainRef.current = lfoGain;
+      const chirpSaw = ctx.createOscillator();
+      chirpSaw.type = "sawtooth";
+      chirpSaw.frequency.value = 3.2;
+      const curveLength = 256;
+      const chirpCurve = new Float32Array(curveLength);
+      for (let i = 0; i < curveLength; i++) {
+        const x = (i / (curveLength - 1)) * 2 - 1;
+        if (x < 0.72) chirpCurve[i] = 0;
+        else chirpCurve[i] = Math.pow((x - 0.72) / 0.28, 0.5) * 0.06;
       }
+      const chirpShaper = ctx.createWaveShaper();
+      chirpShaper.curve = chirpCurve;
+      const chirpGain = ctx.createGain();
+      chirpGain.gain.value = 1;
+      chirpSaw.connect(chirpShaper).connect(chirpGain).connect(gain.gain);
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = noiseBufferRef.current!;
+      noise.loop = true;
+      const bandpass = ctx.createBiquadFilter();
+      bandpass.type = "bandpass";
+      bandpass.frequency.setValueAtTime(useHz, ctx.currentTime);
+      bandpass.Q.value = 3;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = 0.025;
+      noise.connect(bandpass).connect(noiseGain).connect(gain);
+      noise.start();
+
+      buzzLfo.start();
+      chirpSaw.start();
+      lfoRef.current = buzzLfo;
+      lfo2Ref.current = chirpSaw;
+      lfoGainRef.current = chirpGain;
+      noiseRef.current = noise;
+      bandpassRef.current = bandpass;
+    } else if (useTone === "filtered") {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(useHz, ctx.currentTime);
+      osc.connect(gain);
+      osc.start();
+      oscRef.current = osc;
+
+      const lfo = ctx.createOscillator();
+      lfo.type = "triangle";
+      lfo.frequency.value = 2.5;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 0.2;
+      lfo.connect(lfoGain).connect(gain.gain);
+      lfo.start();
+      lfoRef.current = lfo;
+      lfoGainRef.current = lfoGain;
+    } else {
+      const osc = ctx.createOscillator();
+      osc.type = useTone;
+      osc.frequency.setValueAtTime(useHz, ctx.currentTime);
+      osc.connect(gain);
+      osc.start();
+      oscRef.current = osc;
     }
     setIsPlaying(true);
   }, [ensureCtx, hz, tone, volume, stopNodes]);

@@ -99,8 +99,15 @@ export default function App() {
   return (
     <div className="page">
       <div className="card">
-        <h1>Tinnitus Pitch Matcher</h1>
-        <p className="muted">Simple version inspired by your current matcher.</p>
+        <header className="app-header">
+          <div className="logo-wrap">
+            <img src="/logo-borgaa.png" alt="Borgaa" className="logo" />
+          </div>
+          <div className="header-text">
+            <h1>Borgaa Clinic Tinnitus Pitch Matcher</h1>
+            <p className="tagline">developed by the Borgaa Tinnitus Clinic</p>
+          </div>
+        </header>
 
         <div className="controls-row">
           <button
