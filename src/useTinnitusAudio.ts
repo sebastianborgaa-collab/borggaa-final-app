@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type ToneType = "sine" | "cicada" | "cricket" | "triangle" | "sawtooth" | "filtered" | "noise";
+export type ToneType = "sine" | "cicada" | "cricket" | "bbnoise" | "triangle" | "sawtooth" | "filtered" | "noise";
 
 const MIN_HZ = 0;
 const MAX_HZ = 15000;
+const BB_NOISE_REF_HZ = 1000;
 
 function hzToSlider(hz: number) {
   return (hz - MIN_HZ) / (MAX_HZ - MIN_HZ);
@@ -14,7 +15,7 @@ function sliderToHz(v: number) {
 }
 
 function baseGainForTone(tone: ToneType): number {
-  if (tone === "cicada" || tone === "cricket") return 0.2;
+  if (tone === "cicada" || tone === "cricket" || tone === "bbnoise") return 0.2;
   if (tone === "sawtooth") return 0.1;
   return 0.5;
 }
@@ -34,6 +35,21 @@ export function useTinnitusAudio() {
   const bandpassRef = useRef<BiquadFilterNode | null>(null);
   const noiseBufferRef = useRef<AudioBuffer | null>(null);
   const lfo2Ref = useRef<OscillatorNode | null>(null);
+  const bbBufferRef = useRef<AudioBuffer | null>(null);
+  const bbSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  const ensureBbBuffer = useCallback(async (ctx: AudioContext): Promise<AudioBuffer | null> => {
+    if (bbBufferRef.current) return bbBufferRef.current;
+    try {
+      const res = await fetch("/bb-noise.mp3");
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = await ctx.decodeAudioData(arrayBuffer);
+      bbBufferRef.current = buffer;
+      return buffer;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const ensureCtx = useCallback(() => {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
@@ -56,6 +72,7 @@ export function useTinnitusAudio() {
     try { lfoRef.current?.stop(); } catch {}
     try { lfo2Ref.current?.stop(); } catch {}
     try { noiseRef.current?.stop(); } catch {}
+    try { bbSourceRef.current?.stop(); } catch {}
     if (gainRef.current) {
       try { gainRef.current.disconnect(); } catch {}
       gainRef.current = null;
@@ -64,6 +81,7 @@ export function useTinnitusAudio() {
     lfoRef.current = null;
     lfo2Ref.current = null;
     noiseRef.current = null;
+    bbSourceRef.current = null;
     lfoGainRef.current = null;
     bandpassRef.current = null;
   }, []);
@@ -159,6 +177,18 @@ export function useTinnitusAudio() {
       lfoRef.current = buzzLfo;
       lfo2Ref.current = chirpSine;
       lfoGainRef.current = chirpGain;
+    } else if (useTone === "bbnoise") {
+      const buffer = await ensureBbBuffer(ctx);
+      if (buffer) {
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        const rate = Math.max(0.5, Math.min(2, useHz / BB_NOISE_REF_HZ));
+        source.playbackRate.setValueAtTime(rate, ctx.currentTime);
+        source.connect(gain);
+        source.start(0);
+        bbSourceRef.current = source;
+      }
     } else if (useTone === "filtered") {
       const osc = ctx.createOscillator();
       osc.type = "sine";
@@ -185,7 +215,7 @@ export function useTinnitusAudio() {
       oscRef.current = osc;
     }
     setIsPlaying(true);
-  }, [ensureCtx, hz, tone, volume, stopNodes]);
+  }, [ensureCtx, ensureBbBuffer, hz, tone, volume, stopNodes]);
 
   const stop = useCallback(() => {
     stopNodes();
@@ -202,6 +232,11 @@ export function useTinnitusAudio() {
     if (bandpassRef.current && noiseRef.current) {
       bandpassRef.current.frequency.cancelScheduledValues(ctx.currentTime);
       bandpassRef.current.frequency.setTargetAtTime(clamped, ctx.currentTime, 0.008);
+    }
+    if (bbSourceRef.current) {
+      const rate = Math.max(0.5, Math.min(2, clamped / BB_NOISE_REF_HZ));
+      bbSourceRef.current.playbackRate.cancelScheduledValues(ctx.currentTime);
+      bbSourceRef.current.playbackRate.setTargetAtTime(rate, ctx.currentTime, 0.008);
     }
     if (oscRef.current) {
       oscRef.current.frequency.cancelScheduledValues(ctx.currentTime);
