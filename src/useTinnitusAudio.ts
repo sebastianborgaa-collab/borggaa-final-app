@@ -4,7 +4,6 @@ export type ToneType = "sine" | "cicada" | "cricket" | "bbnoise" | "triangle" | 
 
 const MIN_HZ = 0;
 const MAX_HZ = 15000;
-const BB_NOISE_REF_HZ = 1000;
 
 function hzToSlider(hz: number) {
   return (hz - MIN_HZ) / (MAX_HZ - MIN_HZ);
@@ -15,8 +14,9 @@ function sliderToHz(v: number) {
 }
 
 function baseGainForTone(tone: ToneType): number {
-  if (tone === "cicada" || tone === "cricket" || tone === "bbnoise") return 0.2;
+  if (tone === "cicada" || tone === "cricket") return 0.2;
   if (tone === "sawtooth") return 0.1;
+  if (tone === "bbnoise") return 30;
   return 0.5;
 }
 
@@ -37,6 +37,8 @@ export function useTinnitusAudio() {
   const lfo2Ref = useRef<OscillatorNode | null>(null);
   const bbBufferRef = useRef<AudioBuffer | null>(null);
   const bbSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const bbBandpass1Ref = useRef<BiquadFilterNode | null>(null);
+  const bbBandpass2Ref = useRef<BiquadFilterNode | null>(null);
 
   const ensureBbBuffer = useCallback(async (ctx: AudioContext): Promise<AudioBuffer | null> => {
     if (bbBufferRef.current) return bbBufferRef.current;
@@ -82,6 +84,8 @@ export function useTinnitusAudio() {
     lfo2Ref.current = null;
     noiseRef.current = null;
     bbSourceRef.current = null;
+    bbBandpass1Ref.current = null;
+    bbBandpass2Ref.current = null;
     lfoGainRef.current = null;
     bandpassRef.current = null;
   }, []);
@@ -183,11 +187,20 @@ export function useTinnitusAudio() {
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.loop = true;
-        const rate = Math.max(0.5, Math.min(2, useHz / BB_NOISE_REF_HZ));
-        source.playbackRate.setValueAtTime(rate, ctx.currentTime);
-        source.connect(gain);
+        source.playbackRate.setValueAtTime(1, ctx.currentTime);
+        const bandpass1 = ctx.createBiquadFilter();
+        bandpass1.type = "bandpass";
+        bandpass1.frequency.setValueAtTime(useHz, ctx.currentTime);
+        bandpass1.Q.value = 8;
+        const bandpass2 = ctx.createBiquadFilter();
+        bandpass2.type = "bandpass";
+        bandpass2.frequency.setValueAtTime(useHz, ctx.currentTime);
+        bandpass2.Q.value = 8;
+        source.connect(bandpass1).connect(bandpass2).connect(gain);
         source.start(0);
         bbSourceRef.current = source;
+        bbBandpass1Ref.current = bandpass1;
+        bbBandpass2Ref.current = bandpass2;
       }
     } else if (useTone === "filtered") {
       const osc = ctx.createOscillator();
@@ -233,10 +246,13 @@ export function useTinnitusAudio() {
       bandpassRef.current.frequency.cancelScheduledValues(ctx.currentTime);
       bandpassRef.current.frequency.setTargetAtTime(clamped, ctx.currentTime, 0.008);
     }
-    if (bbSourceRef.current) {
-      const rate = Math.max(0.5, Math.min(2, clamped / BB_NOISE_REF_HZ));
-      bbSourceRef.current.playbackRate.cancelScheduledValues(ctx.currentTime);
-      bbSourceRef.current.playbackRate.setTargetAtTime(rate, ctx.currentTime, 0.008);
+    if (bbBandpass1Ref.current) {
+      bbBandpass1Ref.current.frequency.cancelScheduledValues(ctx.currentTime);
+      bbBandpass1Ref.current.frequency.setTargetAtTime(clamped, ctx.currentTime, 0.008);
+    }
+    if (bbBandpass2Ref.current) {
+      bbBandpass2Ref.current.frequency.cancelScheduledValues(ctx.currentTime);
+      bbBandpass2Ref.current.frequency.setTargetAtTime(clamped, ctx.currentTime, 0.008);
     }
     if (oscRef.current) {
       oscRef.current.frequency.cancelScheduledValues(ctx.currentTime);
