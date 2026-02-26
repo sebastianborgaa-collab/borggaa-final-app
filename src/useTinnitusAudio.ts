@@ -133,47 +133,32 @@ export function useTinnitusAudio() {
       oscRef.current = osc;
 
       const buzzLfo = ctx.createOscillator();
-      buzzLfo.type = "triangle";
+      buzzLfo.type = "sine";
       buzzLfo.frequency.value = 48;
       const buzzGain = ctx.createGain();
       buzzGain.gain.value = 0.028;
       buzzLfo.connect(buzzGain).connect(gain.gain);
 
-      const chirpSaw = ctx.createOscillator();
-      chirpSaw.type = "sawtooth";
-      chirpSaw.frequency.value = 3.2;
+      const chirpSine = ctx.createOscillator();
+      chirpSine.type = "sine";
+      chirpSine.frequency.value = 3.2;
       const curveLength = 256;
       const chirpCurve = new Float32Array(curveLength);
       for (let i = 0; i < curveLength; i++) {
         const x = (i / (curveLength - 1)) * 2 - 1;
-        if (x < 0.72) chirpCurve[i] = 0;
-        else chirpCurve[i] = Math.pow((x - 0.72) / 0.28, 0.5) * 0.06;
+        chirpCurve[i] = 0.03 * (1 + x);
       }
       const chirpShaper = ctx.createWaveShaper();
       chirpShaper.curve = chirpCurve;
       const chirpGain = ctx.createGain();
       chirpGain.gain.value = 1;
-      chirpSaw.connect(chirpShaper).connect(chirpGain).connect(gain.gain);
-
-      const noise = ctx.createBufferSource();
-      noise.buffer = noiseBufferRef.current!;
-      noise.loop = true;
-      const bandpass = ctx.createBiquadFilter();
-      bandpass.type = "bandpass";
-      bandpass.frequency.setValueAtTime(useHz, ctx.currentTime);
-      bandpass.Q.value = 3;
-      const noiseGain = ctx.createGain();
-      noiseGain.gain.value = 0.025;
-      noise.connect(bandpass).connect(noiseGain).connect(gain);
-      noise.start();
+      chirpSine.connect(chirpShaper).connect(chirpGain).connect(gain.gain);
 
       buzzLfo.start();
-      chirpSaw.start();
+      chirpSine.start();
       lfoRef.current = buzzLfo;
-      lfo2Ref.current = chirpSaw;
+      lfo2Ref.current = chirpSine;
       lfoGainRef.current = chirpGain;
-      noiseRef.current = noise;
-      bandpassRef.current = bandpass;
     } else if (useTone === "filtered") {
       const osc = ctx.createOscillator();
       osc.type = "sine";
